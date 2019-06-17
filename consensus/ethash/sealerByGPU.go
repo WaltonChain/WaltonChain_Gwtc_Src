@@ -18,6 +18,7 @@ package ethash
 
 import (
 	crand "crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -33,6 +34,7 @@ import (
 	"github.com/wtc/go-wtc/consensus"
 	"github.com/wtc/go-wtc/core/types"
 	"github.com/wtc/go-wtc/log"
+	"github.com/wtc/go-wtc/params"
 )
 
 // Seal implements consensus.Engine, attempting to find a nonce that satisfies
@@ -126,6 +128,16 @@ func (ethash *Ethash) minebyGPU(block *types.Block, id int, seed uint64, abort c
 		//dataset = ethash.dataset(number)
 	)
 
+	var orderHash []byte
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+		set := header.Number.Bytes()
+		origin := sha256.New()
+		origin.Write(set)
+		orderHash = origin.Sum(nil)
+	}else {
+		orderHash = header.HashNoNonce().Bytes()
+	}
+
 	// Start generating random nonces until we abort or find a good one
 	var (
 		// attempts = int64(0)
@@ -143,7 +155,7 @@ func (ethash *Ethash) minebyGPU(block *types.Block, id int, seed uint64, abort c
 	if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
 		target.Mul(bn_txnumber, target)
 	}
-	order := getX11Order(hash, 11)
+	order := getX11Order(orderHash, 11)
 	var servernonce uint64
 
 	if t == 0 {
@@ -158,7 +170,7 @@ func (ethash *Ethash) minebyGPU(block *types.Block, id int, seed uint64, abort c
 			logger.Trace("Ethash nonce search aborted", "attempts", servernonce-seed)
 			return
 		case servernonce = <-serverFound:
-			digest, result := myx11(hash, servernonce, order)
+			digest, result := myx11(header.HashNoNonce().Bytes(), servernonce, order)
 			if Compare(result, FullTo32(target.Bytes()), 32) < 1 {
 				// send(0, nonce, header.Number, hash, target, order)
 
@@ -190,7 +202,18 @@ func sendStop(block *types.Block, port int64) {
 		target = big.NewInt(0)
 	)
 	number := big.NewInt(0)
-	order := getX11Order(hash, 11)
+
+	var orderHash []byte
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+		set := header.Number.Bytes()
+		origin := sha256.New()
+		origin.Write(set)
+		orderHash = origin.Sum(nil)
+	}else {
+		orderHash = header.HashNoNonce().Bytes()
+	}
+	
+	order := getX11Order(orderHash, 11)
 	send(1, 0, number, hash, target, order, port)
 }
 
@@ -199,6 +222,7 @@ func send(control int, nonce uint64, number *big.Int, input []byte, target *big.
 	fmt.Println("send to ", server)
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", server)
 	if err != nil {
+
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
 		os.Exit(1)
 	}

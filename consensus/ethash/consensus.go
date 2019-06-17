@@ -17,6 +17,7 @@
 package ethash
 
 import (
+	"crypto/sha256"
 	"bytes"
 	"errors"
 	"fmt"
@@ -495,7 +496,15 @@ func calcDifficultyFrontier(time uint64, parent *types.Header) *big.Int {
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
 // the PoW difficulty requirements.
 func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Header) error {
-	hash := header.HashNoNonce().Bytes()
+	var orderHash []byte
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+		set := header.Number.Bytes()
+		origin := sha256.New()
+		origin.Write(set)
+		orderHash = origin.Sum(nil)
+	}else {
+		orderHash = header.HashNoNonce().Bytes()
+	}
 
 	// If we're running a fake PoW, accept any seal as valid
 	if ethash.fakeMode {
@@ -529,7 +538,8 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	//digest, result := hashimotoLight(size, cache, header.HashNoNonce().Bytes(), header.Nonce.Uint64())
 	//-----------------------------------------------
 	coinage := header.CoinAge
-	order := getX11Order(hash, 11)
+	
+	order := getX11Order(orderHash, 11)
 	digest, result := myx11(header.HashNoNonce().Bytes(), header.Nonce.Uint64(), order)
 	if !bytes.Equal(header.MixDigest[:], digest) {
 		return errInvalidMixDigest

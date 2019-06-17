@@ -82,4 +82,5 @@ var (
 	DurationLimit          = big.NewInt(6)                    // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not.
 	MinGasFloorCreateContract = big.NewInt(5000)               // The floor of gas to create contract. add by disy.yin disy.yin@gmail.com 2018-12-10
 	AddedRewardForMN	   = big.NewInt(5000)               	//  added reward for MN
+	HardForkV1			   = big.NewInt(148900)					// HardForkV1 fork 
 )

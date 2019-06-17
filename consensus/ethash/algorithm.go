@@ -353,7 +353,7 @@ func getX11Order(hash []byte, length int) []byte {
 		}
 	}
 
-	// fmt.Printf("x11Array1: %s", x11Array[:])
+	// fmt.Printf("X11 order: %s\n", x11Array[:])
 	return x11Array
 }
 

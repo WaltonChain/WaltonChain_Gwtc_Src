@@ -18,6 +18,7 @@ package ethash
 
 import (
 	crand "crypto/rand"
+	"crypto/sha256"
 	// "fmt"
 	"math"
 	"math/big"
@@ -29,6 +30,7 @@ import (
 	"github.com/wtc/go-wtc/consensus"
 	"github.com/wtc/go-wtc/core/types"
 	"github.com/wtc/go-wtc/log"
+	"github.com/wtc/go-wtc/params"
 )
 
 func (ethash *Ethash) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan struct{}, serverFound chan uint64) (*types.Block, error) {
@@ -121,12 +123,22 @@ func (ethash *Ethash) minebyCPU(block *types.Block, id int, seed uint64, abort c
 	// Extract some data from the header
 	var (
 		header = block.Header()
-		hash   = header.HashNoNonce().Bytes()
+		// hash   = header.HashNoNonce().Bytes()
 		target = new(big.Int).Div(maxUint256, header.Difficulty)
 
 		//number  = header.Number.Uint64()
 		//dataset = ethash.dataset(number)
 	)
+
+	var orderHash []byte
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+		set := header.Number.Bytes()
+		origin := sha256.New()
+		origin.Write(set)
+		orderHash = origin.Sum(nil)
+	}else {
+		orderHash = header.HashNoNonce().Bytes()
+	}
 
 	// Start generating random nonces until we abort or find a good one
 	var (
@@ -148,7 +160,7 @@ func (ethash *Ethash) minebyCPU(block *types.Block, id int, seed uint64, abort c
 	if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
 		target.Mul(bn_txnumber, target)
 	}
-	order := getX11Order(hash, 11)
+	order := getX11Order(orderHash, 11)
 
 	// send(nonce, header.Number, hash, target, order)
 	for {
@@ -167,7 +179,7 @@ func (ethash *Ethash) minebyCPU(block *types.Block, id int, seed uint64, abort c
 				attempts = 0
 			}
 			// Compute the PoW value of this nonce
-			digest, result := myx11(hash, nonce, order)
+			digest, result := myx11(header.HashNoNonce().Bytes(), nonce, order)
 			if Compare(result, FullTo32(target.Bytes()), 32) < 1 {
 
 				// Correct nonce found, create a new header with it
