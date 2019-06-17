@@ -548,13 +548,23 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	//if new(big.Int).SetBytes(result).Cmp(target) > 0 {
 	bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
 	bn_coinage = Sqrt(bn_coinage, 6)
-	bn_txnumber := new(big.Int).Mul(new(big.Int).SetUint64(header.TxNumber), big.NewInt(5e+18))
-	bn_txnumber = Sqrt(bn_txnumber, 6)
+
+	var bn_txnumber *big.Int
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+	}else {
+		bn_txnumber = new(big.Int).Mul(new(big.Int).SetUint64(header.TxNumber), big.NewInt(5e+18))
+		bn_txnumber = Sqrt(bn_txnumber, 6)
+	}
+
 	if bn_coinage.Cmp(big.NewInt(0)) > 0 {
 		target.Mul(bn_coinage, target)
 	}
-	if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
-		target.Mul(bn_txnumber, target)
+
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+	}else {
+		if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
+			target.Mul(bn_txnumber, target)
+		}
 	}
 
 	if Compare(result, FullTo32(target.Bytes()), 32) > 0 {

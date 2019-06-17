@@ -28,6 +28,7 @@ import (
 	"github.com/wtc/go-wtc/consensus/ethash"
 	"github.com/wtc/go-wtc/core/types"
 	"github.com/wtc/go-wtc/log"
+	"github.com/wtc/go-wtc/params"
 )
 
 type hashrate struct {
@@ -132,14 +133,25 @@ func (a *RemoteAgent) GetWork() ([3]string, error) {
 		n.Lsh(n, 1)
 		bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
 		bn_coinage = ethash.Sqrt(bn_coinage, 6)
-		bn_txnumber := new(big.Int).Mul(new(big.Int).SetUint64(uint64(len(a.currentWork.txs))), big.NewInt(5e+18))
-		bn_txnumber = ethash.Sqrt(bn_txnumber, 6)
+
+		var bn_txnumber *big.Int
+		if Number.Cmp(params.HardForkV1) >= 0 {
+		}else {
+			bn_txnumber = new(big.Int).Mul(new(big.Int).SetUint64(uint64(len(a.currentWork.txs))), big.NewInt(5e+18))
+			bn_txnumber = ethash.Sqrt(bn_txnumber, 6)
+		}
+
 		if bn_coinage.Cmp(big.NewInt(0)) > 0 {
 			n.Mul(bn_coinage, n)
 		}
-		if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
-			n.Mul(bn_txnumber, n)
+
+		if Number.Cmp(params.HardForkV1) >= 0 {
+		}else {
+			if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
+				n.Mul(bn_txnumber, n)
+			}
 		}
+
 		res[2] = common.BytesToHash(n.Bytes()).Hex()
 
 		a.work[block.HashNoNonce()] = a.currentWork

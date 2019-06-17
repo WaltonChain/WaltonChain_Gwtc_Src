@@ -147,14 +147,25 @@ func (ethash *Ethash) minebyGPU(block *types.Block, id int, seed uint64, abort c
 	logger.Trace("Started ethash search for new nonces", "seed", seed)
 	bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
 	bn_coinage = Sqrt(bn_coinage, 6)
-	bn_txnumber := new(big.Int).Mul(new(big.Int).SetUint64(header.TxNumber), big.NewInt(5e+18))
-	bn_txnumber = Sqrt(bn_txnumber, 6)
+
+	var bn_txnumber *big.Int
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+	}else {		
+		bn_txnumber = new(big.Int).Mul(new(big.Int).SetUint64(header.TxNumber), big.NewInt(5e+18))
+		bn_txnumber = Sqrt(bn_txnumber, 6)
+	}
+
 	if bn_coinage.Cmp(big.NewInt(0)) > 0 {
 		target.Mul(bn_coinage, target)
 	}
-	if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
-		target.Mul(bn_txnumber, target)
+
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+	}else {		
+		if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
+			target.Mul(bn_txnumber, target)
+		}
 	}
+
 	order := getX11Order(orderHash, 11)
 	var servernonce uint64
 
