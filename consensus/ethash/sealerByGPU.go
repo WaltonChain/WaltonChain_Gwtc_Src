@@ -91,7 +91,7 @@ func (ethash *Ethash) SealbyGPU(chain consensus.ChainReader, block *types.Block,
 		pend.Add(1)
 		go func(id int, nonce uint64, serverFound chan uint64) {
 			defer pend.Done()
-			ethash.minebyGPU(block, id, nonce, abort, found, balance, coinage, serverFound, t)
+			ethash.minebyGPU(chain, block, id, nonce, abort, found, balance, coinage, serverFound, t)
 		}(0, uint64(ethash.rand.Int63()), serverFound)
 	}
 	// Wait until sealing is terminated or a nonce is found
@@ -117,7 +117,7 @@ func (ethash *Ethash) SealbyGPU(chain consensus.ChainReader, block *types.Block,
 
 // mine is the actual proof-of-work miner that searches for a nonce starting from
 // seed that results in correct final block difficulty.
-func (ethash *Ethash) minebyGPU(block *types.Block, id int, seed uint64, abort chan struct{}, found chan *types.Block, balance *big.Int, coinage *big.Int, serverFound chan uint64, t int) {
+func (ethash *Ethash) minebyGPU(chain consensus.ChainReader, block *types.Block, id int, seed uint64, abort chan struct{}, found chan *types.Block, balance *big.Int, coinage *big.Int, serverFound chan uint64, t int) {
 	// Extract some data from the header
 	var (
 		header = block.Header()
@@ -128,16 +128,6 @@ func (ethash *Ethash) minebyGPU(block *types.Block, id int, seed uint64, abort c
 		//dataset = ethash.dataset(number)
 	)
 
-	var orderHash []byte
-	if header.Number.Cmp(params.HardForkV1) >= 0 {
-		set := header.Number.Bytes()
-		origin := sha256.New()
-		origin.Write(set)
-		orderHash = origin.Sum(nil)
-	}else {
-		orderHash = header.HashNoNonce().Bytes()
-	}
-
 	// Start generating random nonces until we abort or find a good one
 	var (
 		// attempts = int64(0)
@@ -145,8 +135,6 @@ func (ethash *Ethash) minebyGPU(block *types.Block, id int, seed uint64, abort c
 	)
 	logger := log.New("miner", id)
 	logger.Trace("Started ethash search for new nonces", "seed", seed)
-	bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
-	bn_coinage = Sqrt(bn_coinage, 6)
 
 	var bn_txnumber *big.Int
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
@@ -155,18 +143,42 @@ func (ethash *Ethash) minebyGPU(block *types.Block, id int, seed uint64, abort c
 		bn_txnumber = Sqrt(bn_txnumber, 6)
 	}
 
-	if bn_coinage.Cmp(big.NewInt(0)) > 0 {
-		target.Mul(bn_coinage, target)
+	if header.Number.Cmp(params.HardForkV2) >= 0 {
+		balance, _, _, _ := chain.GetBalanceAndCoinAgeByHeaderHash(header.Coinbase)
+		target = TargetDiff(balance, target)
+	}else {
+		bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
+		bn_coinage = Sqrt(bn_coinage, 6)
+		if bn_coinage.Cmp(big.NewInt(0)) > 0 {
+			target.Mul(bn_coinage, target)
+		}
 	}
 
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
-	}else {		
+	}else {
 		if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
 			target.Mul(bn_txnumber, target)
 		}
 	}
 
+	var orderHash []byte
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+		if header.Number.Cmp(params.HardForkV2) >= 0 {
+			set := header.Number.Bytes()
+			origin := sha256.New()
+			origin.Write(set)
+			orderHash = origin.Sum([]byte("HardForkV2"))
+		}else {
+			set := header.Number.Bytes()
+			origin := sha256.New()
+			origin.Write(set)
+			orderHash = origin.Sum(nil)
+		}
+	}else {
+		orderHash = header.HashNoNonce().Bytes()
+	}
 	order := getX11Order(orderHash, 11)
+
 	var servernonce uint64
 
 	if t == 0 {
@@ -216,10 +228,17 @@ func sendStop(block *types.Block, port int64) {
 
 	var orderHash []byte
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
-		set := header.Number.Bytes()
-		origin := sha256.New()
-		origin.Write(set)
-		orderHash = origin.Sum(nil)
+		if header.Number.Cmp(params.HardForkV2) >= 0 {
+			set := header.Number.Bytes()
+			origin := sha256.New()
+			origin.Write(set)
+			orderHash = origin.Sum([]byte("HardForkV2"))
+		}else {
+			set := header.Number.Bytes()
+			origin := sha256.New()
+			origin.Write(set)
+			orderHash = origin.Sum(nil)
+		}
 	}else {
 		orderHash = header.HashNoNonce().Bytes()
 	}

@@ -131,8 +131,6 @@ func (a *RemoteAgent) GetWork() ([3]string, error) {
 		n.Lsh(n, 255)
 		n.Div(n, block.Difficulty())
 		n.Lsh(n, 1)
-		bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
-		bn_coinage = ethash.Sqrt(bn_coinage, 6)
 
 		var bn_txnumber *big.Int
 		if Number.Cmp(params.HardForkV1) >= 0 {
@@ -141,8 +139,14 @@ func (a *RemoteAgent) GetWork() ([3]string, error) {
 			bn_txnumber = ethash.Sqrt(bn_txnumber, 6)
 		}
 
-		if bn_coinage.Cmp(big.NewInt(0)) > 0 {
-			n.Mul(bn_coinage, n)
+		if Number.Cmp(params.HardForkV2) >= 0 {
+			n = ethash.TargetDiff(oldbalance, n)
+		}else {
+			bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
+			bn_coinage = ethash.Sqrt(bn_coinage, 6)
+			if bn_coinage.Cmp(big.NewInt(0)) > 0 {
+				n.Mul(bn_coinage, n)
+			}
 		}
 
 		if Number.Cmp(params.HardForkV1) >= 0 {

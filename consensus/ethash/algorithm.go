@@ -35,6 +35,7 @@ import (
 	"github.com/wtc/go-wtc/crypto/sha3"
 	"github.com/wtc/go-wtc/crypto/x11"
 	"github.com/wtc/go-wtc/log"
+	"github.com/wtc/go-wtc/params"
 )
 
 const (
@@ -59,6 +60,81 @@ var metaReplace []byte = []byte("AHDGEB")
 // hasher is a repetitive hasher allowing the same hash data structures to be
 // reused between hash runs instead of requiring new ones to be created.
 type hasher func(dest []byte, data []byte)
+
+func log2(number *big.Int) uint {
+	var x = big.NewInt(0)
+	var i uint
+	for i = 0; ; i++ {
+		if x.Rsh(number, i).Cmp(big.NewInt(0)) < 1 {
+			return i
+		}
+	}
+	return 0
+}
+
+func Sqrt(oldnumber *big.Int, exp uint) *big.Int {
+	number := new(big.Int).Div(oldnumber, big.NewInt(1e+14))
+	var x = number.BitLen()
+	var y = new(big.Int).Rsh(number, uint(x)*(exp-1)/exp)
+	return y.Div(y, big.NewInt(32))
+}
+
+func TargetDiffPhase1(_balance *big.Int, _target *big.Int) *big.Int {
+	// 1. target = target*((1/5000000000)*(balance+1)+1)
+	// 2. target = target*(1/5000000000)*(balance+1)+target
+	// 3. target = (target/5000000000)*(balance+1)+target
+
+	// 3.1 (target/5000000000)
+	target := new(big.Int).Div(_target, params.POSPhaseOneBalance)
+
+	// 3.2 (balance+1)
+	balance := new(big.Int).Add(_balance, big.NewInt(1))
+
+	// 3.3 (target/5000000000) * (balance+1)
+	target = new(big.Int).Mul(target, balance)
+
+	// 3.4 (target/5000000000)*(balance+1)+target
+	return new(big.Int).Add(target, _target)
+}
+
+func TargetDiffPhase2(_balance *big.Int, _target *big.Int) *big.Int {
+	// 1. target = target*((4/(POSPhaseTwoBalance-POSPhaseOneBalance))*(_balance-POSPhaseOneBalance)+4)
+	// 2. target = ( target/(POSPhaseTwoBalance-POSPhaseOneBalance) )*4*(_balance-POSPhaseOneBalance) + target*4
+
+	// (_balance-POSPhaseOneBalance) 
+	balance := new(big.Int).Sub(_balance, params.POSPhaseOneBalance)
+	// 4*(_balance-POSPhaseOneBalance)
+	balance = new(big.Int).Mul(balance, big.NewInt(4))
+
+	// (POSPhaseTwoBalance-POSPhaseOneBalance)
+	balancediff := new(big.Int).Sub(params.POSPhaseTwoBalance, params.POSPhaseOneBalance)
+
+	// ( target/(POSPhaseTwoBalance-POSPhaseOneBalance) )
+	target := new(big.Int).Div(_target, balancediff)
+
+	// ( target/(POSPhaseTwoBalance-POSPhaseOneBalance) )*4*(_balance-POSPhaseOneBalance)
+	target = new(big.Int).Mul(target, balance)
+
+	// target*4
+	targetTemp := new(big.Int).Mul(_target, big.NewInt(4))
+
+	return new(big.Int).Add(target, targetTemp)
+}
+
+func TargetDiff(_balance *big.Int, _target *big.Int) *big.Int {
+	balance := new(big.Int).Div(_balance, big.NewInt(1e+12))
+	if balance.Cmp(params.POSPhaseOneBalance) < 0 {
+		return TargetDiffPhase1(balance, _target)
+	}else if balance.Cmp(params.POSPhaseOneBalance) == 0{
+		return new(big.Int).Mul(_target, big.NewInt(4))
+	}else {
+		if balance.Cmp(params.POSPhaseTwoBalance) < 0 {
+			return TargetDiffPhase2(balance, _target)
+		}else {
+			return new(big.Int).Mul(_target, big.NewInt(8))
+		}
+	}
+}
 
 // makeHasher creates a repetitive hasher, allowing the same hash data structures
 // to be reused between hash runs instead of requiring new ones to be created.

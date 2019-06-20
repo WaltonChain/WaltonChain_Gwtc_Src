@@ -496,12 +496,25 @@ func calcDifficultyFrontier(time uint64, parent *types.Header) *big.Int {
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
 // the PoW difficulty requirements.
 func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Header) error {
+	if header.Number.Cmp(params.HardForkV2) == 0 {
+		if header.Difficulty.Cmp(params.HardForkV2diff) != 0 {
+			return errInvalidDifficulty
+		}
+	}
+
 	var orderHash []byte
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
-		set := header.Number.Bytes()
-		origin := sha256.New()
-		origin.Write(set)
-		orderHash = origin.Sum(nil)
+		if header.Number.Cmp(params.HardForkV2) >= 0 {
+			set := header.Number.Bytes()
+			origin := sha256.New()
+			origin.Write(set)
+			orderHash = origin.Sum([]byte("HardForkV2"))
+		}else {
+			set := header.Number.Bytes()
+			origin := sha256.New()
+			origin.Write(set)
+			orderHash = origin.Sum(nil)
+		}
 	}else {
 		orderHash = header.HashNoNonce().Bytes()
 	}
@@ -537,7 +550,6 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	}*/
 	//digest, result := hashimotoLight(size, cache, header.HashNoNonce().Bytes(), header.Nonce.Uint64())
 	//-----------------------------------------------
-	coinage := header.CoinAge
 	
 	order := getX11Order(orderHash, 11)
 	digest, result := myx11(header.HashNoNonce().Bytes(), header.Nonce.Uint64(), order)
@@ -545,9 +557,6 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 		return errInvalidMixDigest
 	}
 	target := new(big.Int).Div(maxUint256, header.Difficulty)
-	//if new(big.Int).SetBytes(result).Cmp(target) > 0 {
-	bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
-	bn_coinage = Sqrt(bn_coinage, 6)
 
 	var bn_txnumber *big.Int
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
@@ -556,8 +565,18 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 		bn_txnumber = Sqrt(bn_txnumber, 6)
 	}
 
-	if bn_coinage.Cmp(big.NewInt(0)) > 0 {
-		target.Mul(bn_coinage, target)
+	if header.Number.Cmp(params.HardForkV2) >= 0 {
+		balance, _, _, _ := chain.GetBalanceAndCoinAgeByHeaderHash(header.Coinbase)
+		target = TargetDiff(balance, target)
+	}else {
+		coinage := header.CoinAge
+		bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
+		bn_coinage = Sqrt(bn_coinage, 6)
+		if bn_coinage.Cmp(big.NewInt(0)) > 0 {
+			target.Mul(bn_coinage, target)
+		}
+		// fmt.Printf("X11 coinage: %d\n", coinage)
+		// fmt.Printf("X11 bn_coinage: %d\n", bn_coinage)
 	}
 
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
@@ -566,6 +585,13 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 			target.Mul(bn_txnumber, target)
 		}
 	}
+
+	// fmt.Printf("X11 order    : %s\n", order)
+	// fmt.Printf("X11 targeto  : %x\n", FullTo32(new(big.Int).Div(maxUint256, header.Difficulty).Bytes()))
+	// fmt.Printf("X11 targetd  : %x\n", FullTo32(target.Bytes()))
+	// fmt.Printf("X11 targetdiv: %d\n", new(big.Int).Div(target, new(big.Int).Div(maxUint256, header.Difficulty)))
+	// fmt.Printf("X11 result   : %x\n", result)
+	// fmt.Printf("X11 miner    : %x\n", header.Coinbase)
 
 	if Compare(result, FullTo32(target.Bytes()), 32) > 0 {
 		return errInvalidPoW

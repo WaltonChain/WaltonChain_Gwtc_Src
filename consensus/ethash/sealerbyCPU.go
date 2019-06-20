@@ -43,7 +43,6 @@ func (ethash *Ethash) Seal(chain consensus.ChainReader, block *types.Block, stop
 // Seal implements consensus.Engine, attempting to find a nonce that satisfies
 // the block's difficulty requirements.
 func (ethash *Ethash) SealbyCPU(chain consensus.ChainReader, block *types.Block, stop <-chan struct{}, serverFound chan uint64) (*types.Block, error) {
-
 	oldbalance, coinage, preNumber, preTime := chain.GetBalanceAndCoinAgeByHeaderHash(block.Header().Coinbase)
 	balance := new(big.Int).Add(oldbalance, big.NewInt(1e+18))
 	//---------------------------------	--------------
@@ -51,10 +50,9 @@ func (ethash *Ethash) SealbyCPU(chain consensus.ChainReader, block *types.Block,
 	Number := block.Header().Number
 	if preTime.Cmp(Time) < 0 && preNumber.Cmp(Number) < 0 {
 		t := new(big.Int).Sub(Time, preTime)
+		// t := new(big.Int).Sub(Time, big.NewInt(0))
 		coinage = new(big.Int).Add(new(big.Int).Mul(balance, t), coinage)
 	}
-
-	// fmt.Println("disy.yin ====>coinage:",coinage, "log2", log2(coinage))
 
 	//-----------------------------------------------
 	// If we're running a fake PoW, simply return a 0 nonce immediately
@@ -93,7 +91,7 @@ func (ethash *Ethash) SealbyCPU(chain consensus.ChainReader, block *types.Block,
 		pend.Add(1)
 		go func(id int, nonce uint64) {
 			defer pend.Done()
-			ethash.minebyCPU(block, id, nonce, abort, found, coinage)
+			ethash.minebyCPU(chain, block, id, nonce, abort, found, coinage)
 		}(i, uint64(ethash.rand.Int63()))
 	}
 	// Wait until sealing is terminated or a nonce is found
@@ -118,7 +116,7 @@ func (ethash *Ethash) SealbyCPU(chain consensus.ChainReader, block *types.Block,
 
 // mine is the actual proof-of-work miner that searches for a nonce starting from
 // seed that results in correct final block difficulty.
-func (ethash *Ethash) minebyCPU(block *types.Block, id int, seed uint64, abort chan struct{}, found chan *types.Block, coinage *big.Int) {
+func (ethash *Ethash) minebyCPU(chain consensus.ChainReader, block *types.Block, id int, seed uint64, abort chan struct{}, found chan *types.Block, coinage *big.Int) {
 
 	// Extract some data from the header
 	var (
@@ -130,28 +128,14 @@ func (ethash *Ethash) minebyCPU(block *types.Block, id int, seed uint64, abort c
 		//dataset = ethash.dataset(number)
 	)
 
-	var orderHash []byte
-	if header.Number.Cmp(params.HardForkV1) >= 0 {
-		set := header.Number.Bytes()
-		origin := sha256.New()
-		origin.Write(set)
-		orderHash = origin.Sum(nil)
-	}else {
-		orderHash = header.HashNoNonce().Bytes()
-	}
-
 	// Start generating random nonces until we abort or find a good one
 	var (
 		attempts = int64(0)
 		nonce    = seed
 	)
-	// fmt.Println("disy.yin ====>Difficulty:",header.Difficulty, "log2:", log2(header.Difficulty))
-	// fmt.Println("disy.yin ====>target:",target, "log2:", log2(target))
 
 	logger := log.New("miner", id)
 	logger.Trace("Started ethash search for new nonces", "seed", seed)
-	bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
-	bn_coinage = Sqrt(bn_coinage, 6)
 
 	var bn_txnumber *big.Int
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
@@ -160,8 +144,15 @@ func (ethash *Ethash) minebyCPU(block *types.Block, id int, seed uint64, abort c
 		bn_txnumber = Sqrt(bn_txnumber, 6)
 	}
 
-	if bn_coinage.Cmp(big.NewInt(0)) > 0 {
-		target.Mul(bn_coinage, target)
+	if header.Number.Cmp(params.HardForkV2) >= 0 {
+		balance, _, _, _ := chain.GetBalanceAndCoinAgeByHeaderHash(header.Coinbase)
+		target = TargetDiff(balance, target)
+	}else {
+		bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
+		bn_coinage = Sqrt(bn_coinage, 6)
+		if bn_coinage.Cmp(big.NewInt(0)) > 0 {
+			target.Mul(bn_coinage, target)
+		}
 	}
 
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
@@ -171,6 +162,22 @@ func (ethash *Ethash) minebyCPU(block *types.Block, id int, seed uint64, abort c
 		}
 	}
 
+	var orderHash []byte
+	if header.Number.Cmp(params.HardForkV1) >= 0 {
+		if header.Number.Cmp(params.HardForkV2) >= 0 {
+			set := header.Number.Bytes()
+			origin := sha256.New()
+			origin.Write(set)
+			orderHash = origin.Sum([]byte("HardForkV2"))
+		}else {
+			set := header.Number.Bytes()
+			origin := sha256.New()
+			origin.Write(set)
+			orderHash = origin.Sum(nil)
+		}
+	}else {
+		orderHash = header.HashNoNonce().Bytes()
+	}
 	order := getX11Order(orderHash, 11)
 
 	// send(nonce, header.Number, hash, target, order)
@@ -210,22 +217,4 @@ func (ethash *Ethash) minebyCPU(block *types.Block, id int, seed uint64, abort c
 			nonce++
 		}
 	}
-}
-
-func log2(number *big.Int) uint {
-	var x = big.NewInt(0)
-	var i uint
-	for i = 0; ; i++ {
-		if x.Rsh(number, i).Cmp(big.NewInt(0)) < 1 {
-			return i
-		}
-
-	}
-	return 0
-}
-func Sqrt(oldnumber *big.Int, exp uint) *big.Int {
-	number := new(big.Int).Div(oldnumber, big.NewInt(1e+14))
-	var x = number.BitLen()
-	var y = new(big.Int).Rsh(number, uint(x)*(exp-1)/exp)
-	return y.Div(y, big.NewInt(32))
 }
