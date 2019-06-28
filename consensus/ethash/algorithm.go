@@ -27,7 +27,6 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
-	"crypto/sha256"
 
 	"github.com/wtc/go-wtc/common"
 	"github.com/wtc/go-wtc/common/bitutil"
@@ -367,25 +366,6 @@ func generateDataset(dest []uint32, epoch uint64, cache []uint32) {
 	}
 	// Wait for all the generators to finish and return
 	pend.Wait()
-}
-
-
-func mysha256(set []byte,nonce uint64) ([]byte,[]byte) { 
-	digest := make([]byte, common.HashLength)
-	hash := sha256.New()
-
-	var res = make([]byte, 8)
-    binary.BigEndian.PutUint64(res, nonce)
-
-
-	for _,v := range res {
-    	set=append(set,v)
-    }
-
-	hash.Write(set)
-	md := hash.Sum(nil)
-	//mdStr := hex.EncodeToString(md)
-	return digest,md
 }
 
 func myx11(set []byte, nonce uint64, order []byte) ([]byte, []byte) {
