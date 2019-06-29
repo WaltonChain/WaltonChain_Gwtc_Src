@@ -99,22 +99,22 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root, root)
 	}
 
-	// Validate the balance need to be great than MinGasFloorCreateContract to create contract.
-	// add by disy.yin disy.yin@gmail.com 2018-12-10
-	transactions := block.Transactions()
-	for i,transaction := range transactions {
-		from, err := transaction.From()
-		if err == nil {
-			balanceNow := statedb.GetBalance(from)
-			balanceBefore := new(big.Int).Add(balanceNow, transaction.Value())
-			totalGas := new(big.Int).Mul(transaction.Gas(), transaction.GasPrice())
-			balanceBefore = new(big.Int).Add(balanceBefore, totalGas)
-			gasFloor := new(big.Int).Mul(params.MinGasFloorCreateContract, big.NewInt(1e+18))
-			if balanceBefore.Cmp(gasFloor) < 0 && transaction.To() == nil {
-				return fmt.Errorf("Not enough balance(%s) < %s with sender to create contract, transaction[%s] intend to create contract.", balanceBefore, gasFloor, big.NewInt(int64(i)))
-			}
-		}
-	}
+	// // Validate the balance need to be great than MinGasFloorCreateContract to create contract.
+	// // add by disy.yin disy.yin@gmail.com 2018-12-10
+	// transactions := block.Transactions()
+	// for i,transaction := range transactions {
+	// 	from, err := transaction.From()
+	// 	if err == nil {
+	// 		balanceNow := statedb.GetBalance(from)
+	// 		balanceBefore := new(big.Int).Add(balanceNow, transaction.Value())
+	// 		totalGas := new(big.Int).Mul(transaction.Gas(), transaction.GasPrice())
+	// 		balanceBefore = new(big.Int).Add(balanceBefore, totalGas)
+	// 		gasFloor := new(big.Int).Mul(params.MinGasFloorCreateContract, big.NewInt(1e+18))
+	// 		if balanceBefore.Cmp(gasFloor) < 0 && transaction.To() == nil {
+	// 			return fmt.Errorf("Not enough balance(%s) < %s with sender to create contract, transaction[%s] intend to create contract.", balanceBefore, gasFloor, big.NewInt(int64(i)))
+	// 		}
+	// 	}
+	// }
 
 	return nil
 }

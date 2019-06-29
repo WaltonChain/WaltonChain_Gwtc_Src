@@ -80,7 +80,7 @@ var (
 	GenesisDifficulty      = big.NewInt(131072)                // Difficulty of the Genesis block.
 	MinimumDifficulty      = big.NewInt(131072)                // The minimum that the difficulty may ever be. 
 	DurationLimit          = big.NewInt(6)                    // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not.
-	MinGasFloorCreateContract = big.NewInt(50)               // The floor of gas to create contract. add by disy.yin disy.yin@gmail.com 2018-12-10
+	// MinGasFloorCreateContract = big.NewInt(50)               // The floor of gas to create contract. add by disy.yin disy.yin@gmail.com 2018-12-10
 	AddedRewardForMN	   = big.NewInt(5000)                //  added reward for MN
 	POSPhaseOneBalance     = big.NewInt(5000000000)			// 5000.000000 WTC
 	POSPhaseTwoBalance     = big.NewInt(500000000000)	    // 500000.000000 WTC

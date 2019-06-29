@@ -585,13 +585,13 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrIntrinsicGas
 	}
 
-	// Validate the balance needed to be great than MinGasFloorCreateContract to create contract.
-	// add by disy.yin disy.yin@gmail.com 2018-12-10
-	gasFloor := new(big.Int).Mul(params.MinGasFloorCreateContract, big.NewInt(1e+18))
-	if pool.currentState.GetBalance(from).Cmp(gasFloor) < 0 && tx.To() == nil {
-		fmt.Errorf("ErrInvalidSenderForCreateContract: GetBalance: %d", pool.currentState.GetBalance(from))
-		return ErrInvalidSenderForCreateContract
-	}
+	// // Validate the balance needed to be great than MinGasFloorCreateContract to create contract.
+	// // add by disy.yin disy.yin@gmail.com 2018-12-10
+	// gasFloor := new(big.Int).Mul(params.MinGasFloorCreateContract, big.NewInt(1e+18))
+	// if pool.currentState.GetBalance(from).Cmp(gasFloor) < 0 && tx.To() == nil {
+	// 	fmt.Errorf("ErrInvalidSenderForCreateContract: GetBalance: %d", pool.currentState.GetBalance(from))
+	// 	return ErrInvalidSenderForCreateContract
+	// }
 
 	return nil
 }
