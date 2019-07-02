@@ -504,7 +504,13 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 
 	var orderHash []byte
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
-		if header.Number.Cmp(params.HardForkV2) >= 0 {
+		if header.Number.Cmp(params.HardForkV3) >= 0 {
+			set := header.Number.Bytes()
+			origin := sha256.New()
+			origin.Write(set)
+			origin.Write([]byte("HardForkV3"))
+			orderHash = origin.Sum(nil)
+		}else if header.Number.Cmp(params.HardForkV2) >= 0 {
 			set := header.Number.Bytes()
 			origin := sha256.New()
 			origin.Write(set)

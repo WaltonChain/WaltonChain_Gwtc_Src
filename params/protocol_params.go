@@ -87,4 +87,5 @@ var (
 	HardForkV1			   = big.NewInt(149500)					// HardForkV1 fork 149500
 	HardForkV2			   = big.NewInt(175366)					// HardForkV2 fork 175366
 	HardForkV2diff		   = big.NewInt(4332176356141)			// HardForkV2 fork difficulty
+	HardForkV3			   = big.NewInt(52560000)				// HardForkV3 fork
 )
