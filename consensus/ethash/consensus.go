@@ -283,22 +283,14 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainReader, header, parent *
 // CalcDifficulty is the difficulty adjustment algorithm. It returns
 // the difficulty that a new block should have when created at time
 // given the parent block's time and difficulty.
-// TODO (karalabe): Move the chain maker into this package and make this private!
-/*func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
-	next := new(big.Int).Add(parent.Number, big1)
-	switch {
-	case config.IsByzantium(next):
-		return calcDifficultyByzantium(time, parent)
-	case config.IsHomestead(next):
-		return calcDifficultyHomestead(time, parent)
-	default:
-		return calcDifficultyFrontier(time, parent)
-	}
-}*/
 func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
 	next := new(big.Int).Add(parent.Number, big1)
-	_ = config.IsByzantium(next)
-	return calcDifficultyWtc(time,parent)
+
+	if next.Cmp(params.HardForkV3) >= 0 {
+		return calcDifficultyPhaseTwo(time,parent)
+	}else {
+		return calcDifficultyPhaseOne(time,parent)
+	}
 }
 
 // Some weird constants to avoid constant memory allocs for them.
@@ -375,7 +367,46 @@ func calcDifficultyByzantium(time uint64, parent *types.Header) *big.Int {
 	return x
 }
 
-func calcDifficultyWtc(time uint64, parent *types.Header) *big.Int {
+func calcDifficultyPhaseTwo(time uint64, parent *types.Header) *big.Int {
+	// diff = parent_diff + (parent_diff / 1024 * max(8 - (block_timestamp - parent_timestamp)/8, -99))
+
+	currentBlockTime := new(big.Int).SetUint64(time)
+	bigParentTime := new(big.Int).Set(parent.Time)
+
+	// holds intermediate values to make the algo easier to read & audit
+	x := new(big.Int)
+	y := new(big.Int)
+
+	// block_timestamp - parent_timestamp
+	x.Sub(currentBlockTime, bigParentTime)
+
+	// fine tune
+	if x.Cmp(big.NewInt(5)) >=0 {
+		x.Sub(x, big.NewInt(3))
+	}
+
+	// 8 - (block_timestamp - parent_timestamp) / 8
+	x.Div(x, big8)
+	x.Sub(big3, x)
+
+	// max(6 - (block_timestamp - parent_timestamp) / 8, -99)
+	if x.Cmp(bigMinus99) < 0 {
+		x.Set(bigMinus99)
+	}
+	// diff = parent_diff + (parent_diff / 1024 * max(8 - (block_timestamp - parent_timestamp)/8, -99))
+	y.Div(parent.Difficulty, params.DifficultyBoundDivisor)
+	x.Mul(y, x)
+	x.Add(parent.Difficulty, x)
+
+	// minimum difficulty can ever be (before exponential factor)
+	if x.Cmp(params.MinimumDifficulty) < 0 {
+		x.Set(params.MinimumDifficulty)
+	}
+
+	return x
+}
+
+func calcDifficultyPhaseOne(time uint64, parent *types.Header) *big.Int {
 	// algorithm:
 	// diff = parent_diff +
 	//        (parent_diff / 2048 * max(6 - (block_timestamp - parent_timestamp) // 10, -99))
