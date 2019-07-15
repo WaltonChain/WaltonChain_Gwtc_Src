@@ -261,8 +261,15 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainReader, header, parent *
 	limit := new(big.Int).Set(parent.GasLimit)
 	limit = limit.Div(limit, params.GasLimitBoundDivisor)
 
-	if diff.Cmp(limit) >= 0 || header.GasLimit.Cmp(params.MinGasLimit) < 0 {
-		return fmt.Errorf("invalid gas limit: have %v, want %v += %v", header.GasLimit, parent.GasLimit, limit)
+	next := new(big.Int).Add(parent.Number, big.NewInt(1))
+	if next.Cmp(params.HardForkV3) >= 0 {
+		if diff.Cmp(limit) >= 0 || header.GasLimit.Cmp(params.MinGasLimitV3) < 0 {
+			return fmt.Errorf("invalid gas limit: have %v, want %v += %v", header.GasLimit, parent.GasLimit, limit)
+		}
+	}else {
+		if diff.Cmp(limit) >= 0 || header.GasLimit.Cmp(params.MinGasLimit) < 0 {
+			return fmt.Errorf("invalid gas limit: have %v, want %v += %v", header.GasLimit, parent.GasLimit, limit)
+		}
 	}
 	// Verify that the block number is parent's +1
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {

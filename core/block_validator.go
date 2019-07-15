@@ -141,13 +141,28 @@ func CalcGasLimit(parent *types.Block) *big.Int {
 	*/
 	gl := new(big.Int).Sub(parent.GasLimit(), decay)
 	gl = gl.Add(gl, contrib)
-	gl.Set(math.BigMax(gl, params.MinGasLimit))
 
-	// however, if we're now below the target (TargetGasLimit) we increase the
-	// limit as much as we can (parentGasLimit / 1024 -1)
-	if gl.Cmp(params.TargetGasLimit) < 0 {
-		gl.Add(parent.GasLimit(), decay)
-		gl.Set(math.BigMin(gl, params.TargetGasLimit))
+
+	next := new(big.Int).Add(parent.Number(), big.NewInt(1))
+	if next.Cmp(params.HardForkV3) >= 0 {
+		gl.Set(math.BigMax(gl, params.MinGasLimitV3))
+
+		// however, if we're now below the target (TargetGasLimitV3) we increase the
+		// limit as much as we can (parentGasLimit / 1024 -1)
+		if gl.Cmp(params.TargetGasLimitV3) < 0 {
+			gl.Add(parent.GasLimit(), decay)
+			gl.Set(math.BigMin(gl, params.TargetGasLimitV3))
+		}
+	}else {
+		gl.Set(math.BigMax(gl, params.MinGasLimit))
+
+		// however, if we're now below the target (TargetGasLimit) we increase the
+		// limit as much as we can (parentGasLimit / 1024 -1)
+		if gl.Cmp(params.TargetGasLimit) < 0 {
+			gl.Add(parent.GasLimit(), decay)
+			gl.Set(math.BigMin(gl, params.TargetGasLimit))
+		}
 	}
+
 	return gl
 }
