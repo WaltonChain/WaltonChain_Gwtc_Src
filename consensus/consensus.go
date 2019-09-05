@@ -76,7 +76,7 @@ type Engine interface {
 
 	// VerifySeal checks whether the crypto seal on a header is valid according to
 	// the consensus rules of the given engine.
-	VerifySeal(chain ChainReader, header *types.Header) error
+	VerifySeal(chain ChainReader, header *types.Header, posShareCheck bool, difficulty *big.Int) error
 
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.

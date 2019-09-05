@@ -5342,6 +5342,12 @@ var methods = function () {
         params: 3
     });
 
+    var posShareCheck = new Method({
+        name: 'posShareCheck',
+        call: 'eth_posShareCheck',
+        params: 4
+    });
+
     var getWork = new Method({
         name: 'getWork',
         call: 'eth_getWork',
@@ -5370,6 +5376,7 @@ var methods = function () {
         compileLLL,
         compileSerpent,
         submitWork,
+        posShareCheck,
         getWork
     ];
 };

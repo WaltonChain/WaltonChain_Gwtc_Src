@@ -17,6 +17,7 @@
 package miner
 
 import (
+	"strconv"
 	"errors"
 	"math/big"
 	"sync"
@@ -193,7 +194,7 @@ func (a *RemoteAgent) SubmitWork(nonce types.BlockNonce, mixDigest, hash common.
 	result.MixDigest = mixDigest
 	result.CoinAge = coinage
 
-	if err := a.engine.VerifySeal(a.chain, result); err != nil {
+	if err := a.engine.VerifySeal(a.chain, result, false, big.NewInt(0)); err != nil {
 		log.Warn("Invalid proof-of-work submitted", "hash", hash, "err", err)
 		return false
 	}
@@ -202,6 +203,46 @@ func (a *RemoteAgent) SubmitWork(nonce types.BlockNonce, mixDigest, hash common.
 	// Solutions seems to be valid, return to the miner and notify acceptance
 	a.returnCh <- &Result{work, block}
 	delete(a.work, hash)
+
+	return true
+}
+
+// PosShareCheck tries to check a pow share solution, returning
+// whether the solution was accepted or not (not can be both a bad pow as well as
+// any other error, like no work pending).
+func (a *RemoteAgent) PosShareCheck(nonce types.BlockNonce, mixDigest, hash common.Hash, difficulty string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	// Make sure the work submitted is present
+	work := a.work[hash]
+	if work == nil {
+		log.Info("Work submitted but none pending", "hash", hash)
+		return false
+	}
+
+	// Make sure the Engine solutions is indeed valid
+	block1 := work.Block
+	oldbalance, coinage, preNumber, preTime := a.chain.GetBalanceAndCoinAgeByHeaderHash(block1.Header().Coinbase)
+	balance := new(big.Int).Add(oldbalance, big.NewInt(1e+18))
+	Time := block1.Header().Time
+	Number := block1.Header().Number
+	if preTime.Cmp(Time) < 0 && preNumber.Cmp(Number) < 0 {
+		t := new(big.Int).Sub(Time, preTime)
+		coinage = new(big.Int).Add(new(big.Int).Mul(balance, t), coinage)
+	}
+
+	result := work.Block.Header()
+	result.Nonce = nonce
+	result.MixDigest = mixDigest
+	result.CoinAge = coinage
+	
+	difficultyInt64, _ := strconv.ParseInt(difficulty, 10, 64)
+
+	if err := a.engine.VerifySeal(a.chain, result, true, new(big.Int).SetInt64(difficultyInt64)); err != nil {
+		log.Warn("Invalid proof-of-work share check", "hash", hash, "err", err)
+		return false
+	}
 
 	return true
 }

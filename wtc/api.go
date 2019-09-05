@@ -97,6 +97,12 @@ func (api *PublicMinerAPI) SubmitWork(nonce types.BlockNonce, solution, digest c
 	return api.agent.SubmitWork(nonce, digest, solution)
 }
 
+// PosShareCheck can be used by external miner to submit their POW solution. It returns an indication if the work was
+// accepted. Note, this is not an indication if the provided work was valid!
+func (api *PublicMinerAPI) PosShareCheck(nonce types.BlockNonce, solution, digest common.Hash, difficulty string) bool {
+	return api.agent.PosShareCheck(nonce, digest, solution, difficulty)
+}
+
 // GetWork returns a work package for external miner. The work package consists of 3 strings
 // result[0], 32 bytes hex encoded current block header pow-hash
 // result[1], 32 bytes hex encoded seed hash used for DAG

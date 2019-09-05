@@ -34,7 +34,7 @@ func TestTestMode(t *testing.T) {
 	}
 	head.Nonce = types.EncodeNonce(block.Nonce())
 	head.MixDigest = block.MixDigest()
-	if err := ethash.VerifySeal(nil, head); err != nil {
+	if err := ethash.VerifySeal(nil, head, false, big.NewInt(0)); err != nil {
 		t.Fatalf("unexpected verification error: %v", err)
 	}
 }

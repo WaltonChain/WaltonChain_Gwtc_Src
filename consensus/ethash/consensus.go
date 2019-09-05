@@ -17,6 +17,7 @@
 package ethash
 
 import (
+	// "encoding/binary"
 	"crypto/sha256"
 	"bytes"
 	"errors"
@@ -277,7 +278,7 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainReader, header, parent *
 	}
 	// Verify the engine specific seal securing the block
 	if seal {
-		if err := ethash.VerifySeal(chain, header); err != nil {
+		if err := ethash.VerifySeal(chain, header, false, big.NewInt(0)); err != nil {
 			return err
 		}
 	}
@@ -533,9 +534,12 @@ func calcDifficultyFrontier(time uint64, parent *types.Header) *big.Int {
 
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
 // the PoW difficulty requirements.
-func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Header) error {
+func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Header, posShareCheck bool, difficulty *big.Int) error {
+	fmt.Printf("YWQ:posShareCheck:%d\n", posShareCheck)
+
 	if header.Number.Cmp(params.HardForkV2) == 0 {
 		if header.Difficulty.Cmp(params.HardForkV2diff) != 0 {
+			fmt.Printf("YWQ:errInvalidDifficulty block lock!\n")
 			return errInvalidDifficulty
 		}
 	}
@@ -567,22 +571,26 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	if ethash.fakeMode {
 		time.Sleep(ethash.fakeDelay)
 		if ethash.fakeFail == header.Number.Uint64() {
+			fmt.Printf("YWQ:fakeMode, errInvalidPoW\n")
 			return errInvalidPoW
 		}
 		return nil
 	}
 	// If we're running a shared PoW, delegate verification to it
 	if ethash.shared != nil {
-		return ethash.shared.VerifySeal(chain, header)
+		fmt.Printf("YWQ:ethash.shared\n")
+		return ethash.shared.VerifySeal(chain, header, false, big.NewInt(0))
 	}
 	// Sanity check that the block number is below the lookup table size (60M blocks)
 	number := header.Number.Uint64()
 	if number/epochLength >= uint64(len(cacheSizes)) {
 		// Go < 1.7 cannot calculate new cache/dataset sizes (no fast prime check)
+		fmt.Printf("YWQ:errNonceOutOfRange\n")
 		return errNonceOutOfRange
 	}
 	// Ensure that we have a valid difficulty for the block
-	if header.Difficulty.Sign() <= 0 {
+	if !posShareCheck && header.Difficulty.Sign() <= 0 {
+		fmt.Printf("YWQ:errInvalidDifficulty\n")
 		return errInvalidDifficulty
 	}
 	// Recompute the digest and PoW value and verify against the header
@@ -598,9 +606,19 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	order := getX11Order(orderHash, 11)
 	digest, result := myx11(header.HashNoNonce().Bytes(), header.Nonce.Uint64(), order)
 	if !bytes.Equal(header.MixDigest[:], digest) {
+		fmt.Printf("YWQ:errInvalidMixDigest\n")
 		return errInvalidMixDigest
 	}
-	target := new(big.Int).Div(maxUint256, header.Difficulty)
+	// target := new(big.Int).Div(maxUint256, header.Difficulty)
+
+	target := new(big.Int)
+	if posShareCheck {
+		target = new(big.Int).Div(maxUint256, difficulty)
+	}else {
+		target = new(big.Int).Div(maxUint256, header.Difficulty)
+	}
+
+	targetOrigin := target
 
 	var bn_txnumber *big.Int
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
@@ -608,7 +626,7 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 		bn_txnumber = new(big.Int).Mul(new(big.Int).SetUint64(header.TxNumber), big.NewInt(5e+18))
 		bn_txnumber = Sqrt(bn_txnumber, 6)
 	}
-
+	
 	if header.Number.Cmp(params.HardForkV2) >= 0 {
 		balance, _, _, _ := chain.GetBalanceAndCoinAgeByHeaderHash(header.Coinbase)
 		target = TargetDiff(balance, target)
@@ -630,6 +648,13 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 		}
 	}
 
+	fmt.Printf("X11 order    : %s\n", order)
+	fmt.Printf("X11 targeto  : %x\n", FullTo32(targetOrigin.Bytes()))
+	fmt.Printf("X11 targetd  : %x\n", FullTo32(target.Bytes()))
+	fmt.Printf("X11 targetdiv: %d\n", new(big.Int).Div(target, targetOrigin))
+	fmt.Printf("X11 result   : %x\n", result)
+	fmt.Printf("X11 miner    : %x\n", header.Coinbase)
+
 	// fmt.Printf("X11 order    : %s\n", order)
 	// fmt.Printf("X11 targeto  : %x\n", FullTo32(new(big.Int).Div(maxUint256, header.Difficulty).Bytes()))
 	// fmt.Printf("X11 targetd  : %x\n", FullTo32(target.Bytes()))
@@ -638,6 +663,7 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	// fmt.Printf("X11 miner    : %x\n", header.Coinbase)
 
 	if Compare(result, FullTo32(target.Bytes()), 32) > 0 {
+		fmt.Printf("YWQ:FullTo32  errInvalidPoW\n")
 		return errInvalidPoW
 	}
 	return nil
