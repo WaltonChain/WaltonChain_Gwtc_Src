@@ -17,9 +17,9 @@
 package miner
 
 import (
-	"strconv"
 	"errors"
 	"math/big"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -135,14 +135,14 @@ func (a *RemoteAgent) GetWork() ([3]string, error) {
 
 		var bn_txnumber *big.Int
 		if Number.Cmp(params.HardForkV1) >= 0 {
-		}else {
+		} else {
 			bn_txnumber = new(big.Int).Mul(new(big.Int).SetUint64(uint64(len(a.currentWork.txs))), big.NewInt(5e+18))
 			bn_txnumber = ethash.Sqrt(bn_txnumber, 6)
 		}
 
 		if Number.Cmp(params.HardForkV2) >= 0 {
 			n = ethash.TargetDiff(oldbalance, n)
-		}else {
+		} else {
 			bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
 			bn_coinage = ethash.Sqrt(bn_coinage, 6)
 			if bn_coinage.Cmp(big.NewInt(0)) > 0 {
@@ -151,7 +151,7 @@ func (a *RemoteAgent) GetWork() ([3]string, error) {
 		}
 
 		if Number.Cmp(params.HardForkV1) >= 0 {
-		}else {
+		} else {
 			if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
 				n.Mul(bn_txnumber, n)
 			}
@@ -236,11 +236,11 @@ func (a *RemoteAgent) PosShareCheck(nonce types.BlockNonce, mixDigest, hash comm
 	result.Nonce = nonce
 	result.MixDigest = mixDigest
 	result.CoinAge = coinage
-	
+
 	difficultyInt64, _ := strconv.ParseInt(difficulty, 10, 64)
 
 	if err := a.engine.VerifySeal(a.chain, result, true, new(big.Int).SetInt64(difficultyInt64)); err != nil {
-		log.Warn("Invalid proof-of-work share check", "hash", hash, "err", err)
+		// log.Warn("Invalid proof-of-work share check", "hash", hash, "err", err)
 		return false
 	}
 

@@ -18,8 +18,8 @@ package ethash
 
 import (
 	// "encoding/binary"
-	"crypto/sha256"
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/big"
@@ -267,7 +267,7 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainReader, header, parent *
 		if diff.Cmp(limit) >= 0 || header.GasLimit.Cmp(params.MinGasLimitV3) < 0 {
 			return fmt.Errorf("invalid gas limit: have %v, want %v += %v", header.GasLimit, parent.GasLimit, limit)
 		}
-	}else {
+	} else {
 		if diff.Cmp(limit) >= 0 || header.GasLimit.Cmp(params.MinGasLimit) < 0 {
 			return fmt.Errorf("invalid gas limit: have %v, want %v += %v", header.GasLimit, parent.GasLimit, limit)
 		}
@@ -295,9 +295,9 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
 	next := new(big.Int).Add(parent.Number, big1)
 
 	if next.Cmp(params.HardForkV3) >= 0 {
-		return calcDifficultyPhaseTwo(time,parent)
-	}else {
-		return calcDifficultyPhaseOne(time,parent)
+		return calcDifficultyPhaseTwo(time, parent)
+	} else {
+		return calcDifficultyPhaseOne(time, parent)
 	}
 }
 
@@ -389,7 +389,7 @@ func calcDifficultyPhaseTwo(time uint64, parent *types.Header) *big.Int {
 	x.Sub(currentBlockTime, bigParentTime)
 
 	// fine tune
-	if x.Cmp(big.NewInt(5)) >=0 {
+	if x.Cmp(big.NewInt(5)) >= 0 {
 		x.Sub(x, big.NewInt(3))
 	}
 
@@ -418,7 +418,7 @@ func calcDifficultyPhaseOne(time uint64, parent *types.Header) *big.Int {
 	// algorithm:
 	// diff = parent_diff +
 	//        (parent_diff / 2048 * max(6 - (block_timestamp - parent_timestamp) // 10, -99))
-	//        
+	//
 	//logger := log.New("epoch", epoch)
 	bigTime := new(big.Int).SetUint64(time)
 	bigParentTime := new(big.Int).Set(parent.Time)
@@ -427,8 +427,6 @@ func calcDifficultyPhaseOne(time uint64, parent *types.Header) *big.Int {
 	x := new(big.Int)
 	y := new(big.Int)
 
-	
-   
 	// 6 - (block_timestamp - parent_timestamp) // 10
 	x.Sub(bigTime, bigParentTime)
 	x.Div(x, big10)
@@ -535,7 +533,7 @@ func calcDifficultyFrontier(time uint64, parent *types.Header) *big.Int {
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
 // the PoW difficulty requirements.
 func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Header, posShareCheck bool, difficulty *big.Int) error {
-	fmt.Printf("YWQ:posShareCheck:%d\n", posShareCheck)
+	// fmt.Printf("YWQ:posShareCheck:%d\n", posShareCheck)
 
 	if header.Number.Cmp(params.HardForkV2) == 0 {
 		if header.Difficulty.Cmp(params.HardForkV2diff) != 0 {
@@ -552,18 +550,18 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 			origin.Write(set)
 			origin.Write([]byte("HardForkV3"))
 			orderHash = origin.Sum(nil)
-		}else if header.Number.Cmp(params.HardForkV2) >= 0 {
+		} else if header.Number.Cmp(params.HardForkV2) >= 0 {
 			set := header.Number.Bytes()
 			origin := sha256.New()
 			origin.Write(set)
 			orderHash = origin.Sum([]byte("HardForkV2"))
-		}else {
+		} else {
 			set := header.Number.Bytes()
 			origin := sha256.New()
 			origin.Write(set)
 			orderHash = origin.Sum(nil)
 		}
-	}else {
+	} else {
 		orderHash = header.HashNoNonce().Bytes()
 	}
 
@@ -602,7 +600,7 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	}*/
 	//digest, result := hashimotoLight(size, cache, header.HashNoNonce().Bytes(), header.Nonce.Uint64())
 	//-----------------------------------------------
-	
+
 	order := getX11Order(orderHash, 11)
 	digest, result := myx11(header.HashNoNonce().Bytes(), header.Nonce.Uint64(), order)
 	if !bytes.Equal(header.MixDigest[:], digest) {
@@ -614,23 +612,23 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	target := new(big.Int)
 	if posShareCheck {
 		target = new(big.Int).Div(maxUint256, difficulty)
-	}else {
+	} else {
 		target = new(big.Int).Div(maxUint256, header.Difficulty)
 	}
 
-	targetOrigin := target
+	// targetOrigin := target
 
 	var bn_txnumber *big.Int
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
-	}else {
+	} else {
 		bn_txnumber = new(big.Int).Mul(new(big.Int).SetUint64(header.TxNumber), big.NewInt(5e+18))
 		bn_txnumber = Sqrt(bn_txnumber, 6)
 	}
-	
+
 	if header.Number.Cmp(params.HardForkV2) >= 0 {
 		balance, _, _, _ := chain.GetBalanceAndCoinAgeByHeaderHash(header.Coinbase)
 		target = TargetDiff(balance, target)
-	}else {
+	} else {
 		coinage := header.CoinAge
 		bn_coinage := new(big.Int).Mul(coinage, big.NewInt(1))
 		bn_coinage = Sqrt(bn_coinage, 6)
@@ -642,18 +640,18 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	}
 
 	if header.Number.Cmp(params.HardForkV1) >= 0 {
-	}else {
+	} else {
 		if bn_txnumber.Cmp(big.NewInt(0)) > 0 {
 			target.Mul(bn_txnumber, target)
 		}
 	}
 
-	fmt.Printf("X11 order    : %s\n", order)
-	fmt.Printf("X11 targeto  : %x\n", FullTo32(targetOrigin.Bytes()))
-	fmt.Printf("X11 targetd  : %x\n", FullTo32(target.Bytes()))
-	fmt.Printf("X11 targetdiv: %d\n", new(big.Int).Div(target, targetOrigin))
-	fmt.Printf("X11 result   : %x\n", result)
-	fmt.Printf("X11 miner    : %x\n", header.Coinbase)
+	// fmt.Printf("X11 order    : %s\n", order)
+	// fmt.Printf("X11 targeto  : %x\n", FullTo32(targetOrigin.Bytes()))
+	// fmt.Printf("X11 targetd  : %x\n", FullTo32(target.Bytes()))
+	// fmt.Printf("X11 targetdiv: %d\n", new(big.Int).Div(target, targetOrigin))
+	// fmt.Printf("X11 result   : %x\n", result)
+	// fmt.Printf("X11 miner    : %x\n", header.Coinbase)
 
 	// fmt.Printf("X11 order    : %s\n", order)
 	// fmt.Printf("X11 targeto  : %x\n", FullTo32(new(big.Int).Div(maxUint256, header.Difficulty).Bytes()))
@@ -663,7 +661,7 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 	// fmt.Printf("X11 miner    : %x\n", header.Coinbase)
 
 	if Compare(result, FullTo32(target.Bytes()), 32) > 0 {
-		fmt.Printf("YWQ:FullTo32  errInvalidPoW\n")
+		// fmt.Printf("YWQ:FullTo32  errInvalidPoW\n")
 		return errInvalidPoW
 	}
 	return nil
@@ -718,11 +716,11 @@ func getReward(block, balance *big.Int) *big.Int {
 
 	if block.Int64() <= 40000 {
 		reward = big.NewInt(1e+17)
-	}else if block.Int64() > 40000 && block.Int64() <= 100000{
+	} else if block.Int64() > 40000 && block.Int64() <= 100000 {
 		reward = big.NewInt(1e+18)
-	}else if block.Int64() > 100000 && block.Int64() <= 200000{
+	} else if block.Int64() > 100000 && block.Int64() <= 200000 {
 		reward = big.NewInt(2e+18)
-	}else if years < 2 {
+	} else if years < 2 {
 		reward = big.NewInt(25e+17)
 		if balance.Cmp(big5000) >= 0 {
 			reward = reward.Add(reward, big.NewInt(5e+17))
@@ -742,6 +740,6 @@ func getReward(block, balance *big.Int) *big.Int {
 		reward = new(big.Int).Div(reward, big.NewInt(100000))
 		reward = new(big.Int).Mul(reward, big.NewInt(int64(discount)))
 	}
-	
+
 	return reward
 }
