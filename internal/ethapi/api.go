@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/util"
 	"github.com/wtc/go-wtc/accounts"
 	"github.com/wtc/go-wtc/accounts/keystore"
 	"github.com/wtc/go-wtc/common"
@@ -39,8 +41,6 @@ import (
 	"github.com/wtc/go-wtc/params"
 	"github.com/wtc/go-wtc/rlp"
 	"github.com/wtc/go-wtc/rpc"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 const (
@@ -451,6 +451,11 @@ type PublicBlockChainAPI struct {
 // NewPublicBlockChainAPI creates a new Wtc blockchain API.
 func NewPublicBlockChainAPI(b Backend) *PublicBlockChainAPI {
 	return &PublicBlockChainAPI{b}
+}
+
+// ChainId returns the chainID value for transaction replay protection.
+func (s *PublicBlockChainAPI) ChainId() *hexutil.Big {
+	return (*hexutil.Big)(s.b.ChainConfig().ChainId)
 }
 
 // BlockNumber returns the block number of the chain head.
